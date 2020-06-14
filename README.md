@@ -45,6 +45,20 @@ resource "aws_instance" "myinstance" {
   instance_type = "t2.micro"
 key_name=var.enter_ur_keyname
 security_groups=["${aws_security_group.allow_tls.name}"]
+connection {
+    type     = "ssh"
+    user     = "ec2-user"
+    private_key = file("C:/Users/mamatha/Downloads/mykey.pem")
+    host     = aws_instance.myinstance.public_ip
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum install httpd php git -y",
+      "sudo systemctl restart httpd",
+      "sudo systemctl enable httpd",
+    ]
+  }
 
   tags = {
     Name = "linuxworldos"
@@ -64,8 +78,44 @@ resource "aws_volume_attachment" "ebs_att" {
   instance_id = "${aws_instance.myinstance.id}"
   force_detach=true
 }
-resource "null_resource" "nulllocal1" {
-       provisioner "local-exec"{
-           command = "start chrome www.yahoo.com"
-         }
+output "myos_ip" {
+  value = aws_instance.myinstance.public_ip
 }
+
+
+resource "null_resource" "nulllocal2"  {
+
+  connection {
+    type     = "ssh"
+    user     = "ec2-user"
+    private_key = file("C:/Users/mamatha/Downloads/mykey.pem")
+    host     = aws_instance.myinstance.public_ip
+  }
+
+provisioner "remote-exec" {
+    inline = [
+      "sudo mkfs.ext4  /dev/xvda",
+      "sudo mount  /dev/xvda  /var/www/html",
+      "sudo rm -rf /var/www/html/*",
+      "sudo git clone https://github.com/mamatha67/-HybridCloud-H.git /var/www/html/"
+    ]
+  }
+
+depends_on = [
+    aws_volume_attachment.ebs_att,
+  ]
+}
+resource "aws_s3_bucket""mammubucket123"{
+bucket ="mammubucket123"
+acl="public-read"
+force_destroy=true
+cors_rule{
+allowed_headers=["*"]
+allowed_methods=["PUT","POST"]
+allowed_origins=["https://mammubucket123"]
+expose_headers=["ETag"]
+max_age_seconds=3000
+}
+}
+
+
