@@ -126,19 +126,6 @@ when=destroy
 command="rm -rf my_images"
 }
 }
-resource "aws_s3_bucket_object""bucket-object"{
-
-bucket="${aws_s3_bucket.mammubucket123.bucket}"
-
-key="myimage.jpg"
-
-source="myimage/myimage.jpg"
-
-acl="public-read"
-
-}
-
-
 resource "aws_cloudfront_distribution" "s3-web-distribution" {
   origin {
     domain_name = "${aws_s3_bucket.mammubucket123.bucket_regional_domain_name}"
@@ -218,5 +205,3 @@ provisioner"local-exec"{
 command="chrome${aws_instance.myinstance.public_ip}"
 }
 }
-
-
