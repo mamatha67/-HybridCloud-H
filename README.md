@@ -54,7 +54,8 @@ connection {
 
   provisioner "remote-exec" {
     inline = [
-      "sudo yum install httpd php git -y",
+      "sudo yum update -y",
+      "sudo yum install httpd  git -y",
       "sudo systemctl restart httpd",
       "sudo systemctl enable httpd",
     ]
@@ -83,7 +84,11 @@ output "myos_ip" {
 }
 
 
-resource "null_resource" "nulllocal2"  {
+
+resource "null_resource" "nullremote3"  {
+depends_on=[
+aws_volume_attachment.ebs_att,
+]
 
   connection {
     type     = "ssh"
@@ -100,11 +105,6 @@ provisioner "remote-exec" {
       "sudo git clone https://github.com/mamatha67/-HybridCloud-H.git /var/www/html/"
     ]
   }
-
-depends_on = [
-    aws_volume_attachment.ebs_att,
-  ]
-}
 resource "aws_s3_bucket""mammubucket123"{
 bucket ="mammubucket123"
 acl="public-read"
@@ -115,6 +115,107 @@ allowed_methods=["PUT","POST"]
 allowed_origins=["https://mammubucket123"]
 expose_headers=["ETag"]
 max_age_seconds=3000
+}
+}
+resource "null_resource" "images_repo"{
+provisioner "local-exec"{
+command="git clone https://github.com/mamatha67/-HybridCloud-H.git myimage"
+}
+provisioner"local-exec"{
+when=destroy
+command="rm -rf my_images"
+}
+}
+resource "aws_s3_bucket_object""bucket-object"{
+
+bucket="${aws_s3_bucket.mammubucket123.bucket}"
+
+key="myimage.jpg"
+
+source="myimage/myimage.jpg"
+
+acl="public-read"
+
+}
+
+
+resource "aws_cloudfront_distribution" "s3-web-distribution" {
+  origin {
+    domain_name = "${aws_s3_bucket.mammubucket123.bucket_regional_domain_name}"
+    origin_id   = "${aws_s3_bucket.mammubucket123.id}"
+  }
+
+
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "S3 Web Distribution"
+
+
+  default_cache_behavior {
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "${aws_s3_bucket.mammubucket123.id}"
+
+
+    forwarded_values {
+      query_string = false
+
+
+      cookies {
+        forward = "none"
+      }
+    }
+
+
+    viewer_protocol_policy = "allow-all"
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
+  }
+
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "whitelist"
+      locations        = ["IN"]
+    }
+  }
+
+
+  tags = {
+    Name        = "Web-CF-Distribution"
+    Environment = "Production"
+  }
+
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+
+  depends_on = [
+    aws_s3_bucket.mammubucket123
+  ]
+}
+resource "aws_ebs_snapshot" "ebs_snapshot" {
+  volume_id   = "${aws_ebs_volume.esb2.id}"
+  description = "Snapshot of our EBS volume"
+  
+  tags = {
+    env = "Production"
+  }
+
+
+  depends_on = [
+    aws_volume_attachment.ebs_att
+  ]
+}
+resource "null_resource""nulllocal1"{
+depends_on=[
+null_resource.nullremote3,
+]
+provisioner"local-exec"{
+command="chrome${aws_instance.myinstance.public_ip}"
 }
 }
 
